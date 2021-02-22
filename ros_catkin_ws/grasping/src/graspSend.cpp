@@ -14,7 +14,7 @@ int main(int argc, char **argv)
   int count = 0;
   while (ros::ok())
   {
-   
+
     std_msgs::Int64 msg;
     msg.data = count;
 

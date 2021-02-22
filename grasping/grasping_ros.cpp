@@ -1,8 +1,6 @@
 /* ************************************************************************************************************************** */
 /*
-
- ** 	Charilaos P. Kalavritinos
-  	@ CSL Mech NTUA 								**
+ ** 	Charilaos P. Kalavritinos@ CSL Mech NTUA 								**
 
 
 PREREQUISITES:
@@ -14,19 +12,19 @@ PREREQUISITES:
 	LDFLAGS=-L. -llabview_dll
 
 HOW TO RUN:
-	  1. sudo su 
+	  1. sudo su
 	  (2. source initbiosemi.sh)
 	  3. roscd biosemi
-	  4. rosrun biosemi biosemiNode [arguments] 
-	
+	  4. rosrun biosemi biosemiNode [arguments]
+
 PARAMETERS
 	  0. paramfile.txt includes parameters for processing and decoding procedures
 	  1. ClassificationParamfile includes parameters used in classification procedures and creation of weights
-      2. MACROS 
-          READ_FROM_FILE 
+      2. MACROS
+          READ_FROM_FILE
           FILE_TO_READ
-          WRITE_IN_OR_OUT 
-          PA10_CONTROL etc.    		
+          WRITE_IN_OR_OUT
+          PA10_CONTROL etc.
 
 */
 
@@ -36,11 +34,11 @@ PARAMETERS
 //#include <geometry_msgs/Vector3Stamped.h>
 #include "std_msgs/Int64.h"
 
-#include <stdio.h> 
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/time.h>
-#include <unistd.h>	
+#include <unistd.h>
 #include <errno.h>
 #include <signal.h>
 
@@ -69,18 +67,18 @@ PARAMETERS
 #define BUFFER_ORDER 10
 
 
-#define READ_FROM_FILE 1					// if input from file or from device 
-#define NN_SIZE 30						// max values permitted 
-#define NN_NEURONS 30 
+#define READ_FROM_FILE 1					// if input from file or from device
+#define NN_SIZE 30						// max values permitted
+#define NN_NEURONS 30
 #define FILE_TO_READ 	"./eeg1"
 #define WRITE_IN_OR_OUT 0
 #define WINDOW 250
 
 using namespace std;
 
-#if defined(_WIN64) 
- typedef __int64 INT_PTR; 
-#else 
+#if defined(_WIN64)
+ typedef __int64 INT_PTR;
+#else
  typedef int INT_PTR;
 #endif
 
@@ -106,15 +104,15 @@ class Eeg_Processing
 {
 private:
   	int chIndex[BIO_CHANS];
-    
+
   	struct meanStruct {					// rmean calculation
     	unsigned long int lastindex; 				// start from 0
     	double lastmean[BIO_CHANS];
   	} 	rmean;
-  
-  
+
+
  	int nnLayers;
- 	int neuronsPerLayer[NN_SIZE];  
+ 	int neuronsPerLayer[NN_SIZE];
   	int TransferFcn[NN_SIZE];				// for NN classifier
   	
 	double w1[NN_NEURONS][WINDOW];
@@ -154,13 +152,13 @@ public:
   	bool resampleTime();
 
     int read_parameters();
-	
+
 	void channel_selection();	// select channels
-																   	
-  	void mapminmax();													
+
+  	void mapminmax();
   	void mapminmaxInv();
 	void nnDecode();
-	
+
 };
 
 class Biosemi_Acq
@@ -169,7 +167,7 @@ private:
 	PUCHAR	ringBuffer;
 	CHAR 	controlBuffer[64];
 	char	infoBuffer[120];
-	INT_PTR	ringBufferSize; // 32Mbytes 
+	INT_PTR	ringBufferSize; // 32Mbytes
 	INT_PTR bytes2Use;
 	HANDLE	handle;
 	float bytesPerMsec;
@@ -180,18 +178,18 @@ private:
 	INT_PTR	seam;
   	INT_PTR	orion;
 	INT_PTR	lastSeam;
-	
+
 public:
   long int datum[4520][BIO_CHANS]; // 565 samples in 128Kbyte
   // = round [stride / (NUM_CHANNELS * 4 bytes_per_channel)]
-  
+
   Biosemi_Acq();
-	~Biosemi_Acq();	
+	~Biosemi_Acq();
   int Biosemi_Acq_Init(void);
   int Biosemi_Acq_Start(void);
-  int Biosemi_Acq_Get(void); 
-  int Biosemi_Acq_Close(void); 
-  int Biosemi_Acq_Status(void); 
+  int Biosemi_Acq_Get(void);
+  int Biosemi_Acq_Close(void);
+  int Biosemi_Acq_Status(void);
 };
 
 
@@ -200,15 +198,15 @@ int main(int argc, char **argv)
 {
 
 /*** VARIABLES ***/
-  
+
   // ros
   	ros::init(argc, argv, "GraspNode"); // Init ROS publisher
   	ros::NodeHandle nHandle;
-  	ros::Publisher eegPublisher = 
+  	ros::Publisher eegPublisher =
         nHandle.advertise<std_msgs::Int64>("eeg", 1000);
  	ros::Rate loopRate(BIO_FREQ/BIO_SAMPLES); // loop at 'read' frequency
   	std_msgs::Int64 msg;
-  
+
 
 
 	Eeg_Processing eegsig;
@@ -220,25 +218,25 @@ int main(int argc, char **argv)
 
 
 	/*** READ ARGUMENTS ***/
-	
+
 	if (argc<2)
 	{
 		printf("Usage: No File to Write (1st argument)..\n");
 		printf("Try: 'rosrun rqt_plot rqt_plot' for online visualization..\n");
 	}
-	else	
+	else
 	{
 		/* open and clear file */
 		writeFile = 1;
 		eegfile = fopen (argv[1],"w");
 		printf("Output file: '%s'\n",argv[1]);
 	}
-	
+
 	if (argc<3)
 	{
 		printf("Unlimitted acquisition. Press Ctrl-C to end..\n");
 		printf("Usage: 2nd argument is time limit (optional)..\n");
-	}	
+	}
 	else
 	{
 		time_limit = atoi(argv[2]);
@@ -247,10 +245,9 @@ int main(int argc, char **argv)
 
 
 	// OPEN CLASSIFICATION PARAMETER FILE AND READ PARAMETERS
-	
 	paramfile = fopen ("CLparamfile.txt","r");
-	 
-	if( eegsig.read_parameters() < 0 )  
+
+	if( eegsig.read_parameters() < 0 )
 	return -1; 
 	fclose(paramfile);
 
