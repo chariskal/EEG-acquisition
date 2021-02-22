@@ -1,0 +1,357 @@
+#!/usr/bin/env python
+
+import roslib
+import rospy
+import time
+import numpy as np
+from math import *
+import argparse
+import sys
+from ar_pose.msg import ARMarkersExtended
+from pa10_remote.msg import PPCVisionData
+from std_msgs.msg import Float64MultiArray, MultiArrayDimension
+from geometry_msgs.msg import Twist, Quaternion, Vector3
+from math_utils import *
+from pa10_kinematics import *
+
+#FOR IBVS
+targetA = np.zeros([7],dtype=float)
+targetB = np.zeros([7],dtype=float)
+targetF = np.zeros([7],dtype=float)
+targetG = np.zeros([7],dtype=float) 
+
+rhol_u = np.array([0.0, 0.0, 0.0, 0.0])
+rhol_v = np.array([0.0, 0.0, 0.0, 0.0])
+rhou_u = np.array([0.0, 0.0, 0.0, 0.0])
+rhou_v = np.array([0.0, 0.0, 0.0, 0.0])
+
+Ml_u = np.array([0.0, 0.0, 0.0, 0.0])
+Ml_v = np.array([0.0, 0.0, 0.0, 0.0])
+Mu_u = np.array([0.0, 0.0, 0.0, 0.0])
+Mu_v = np.array([0.0, 0.0, 0.0, 0.0])
+
+
+q = np.zeros([7],dtype=float)
+
+def updateVisionStatesIBVS(m):
+        
+        global targetA
+        global targetB
+        global targetF
+        global targetG
+ 
+        for poses in m.markers:
+      
+            if poses.id == 0:
+               targetA[0] =  poses.pose.pose.position.x #x
+               targetA[1] =  poses.pose.pose.position.y #y
+               targetA[2] =  poses.pose.pose.position.z #z
+	       #Quaternions
+               targetA[3] = poses.pose.pose.orientation.x #qx
+               targetA[4] = poses.pose.pose.orientation.y #qy
+               targetA[5] = poses.pose.pose.orientation.z #qz
+               targetA[6] = poses.pose.pose.orientation.w #qw
+
+            if poses.id == 1:
+               targetB[0] =  poses.pose.pose.position.x #x
+               targetB[1] =  poses.pose.pose.position.y #y
+               targetB[2] =  poses.pose.pose.position.z #z
+	       #Quaternions
+               targetB[3] = poses.pose.pose.orientation.x #qx
+               targetB[4] = poses.pose.pose.orientation.y #qy
+               targetB[5] = poses.pose.pose.orientation.z #qz
+               targetB[6] = poses.pose.pose.orientation.w #qw
+
+            if poses.id == 2:
+               targetF[0] =  poses.pose.pose.position.x #x
+               targetF[1] =  poses.pose.pose.position.y #y
+               targetF[2] =  poses.pose.pose.position.z #z
+	       #Quaternions
+               targetF[3] = poses.pose.pose.orientation.x #qx
+               targetF[4] = poses.pose.pose.orientation.y #qy
+               targetF[5] = poses.pose.pose.orientation.z #qz
+               targetF[6] = poses.pose.pose.orientation.w #qw
+
+            if poses.id == 3:
+               targetG[0] =  poses.pose.pose.position.x #x
+               targetG[1] =  poses.pose.pose.position.y #y
+               targetG[2] =  poses.pose.pose.position.z #z
+	       #Quaternions
+               targetG[3] = poses.pose.pose.orientation.x #qx
+               targetG[4] = poses.pose.pose.orientation.y #qy
+               targetG[5] = poses.pose.pose.orientation.z #qz
+               targetG[6] = poses.pose.pose.orientation.w #qw
+
+def updateArmStates(msg):
+
+    global q
+   
+    for i in range (0,7):
+      q[i] = msg.data[i]*pi/180.0
+
+    
+def ImageBasedVS(targetA, targetB, targetF, targetG):
+
+    
+
+    ax = 529.486683
+    ay = 521.956767
+
+    Z0 = targetA[2]
+    Z1 = targetB[2]
+    Z2 = targetF[2]
+    Z3 = targetG[2]
+
+    if Z0 == 0.0:
+       Z0 = 0.001
+    if Z1 == 0.0:
+       Z1 = 0.001
+    if Z2 == 0.0:
+       Z2 = 0.001
+    if Z3 == 0.0:
+       Z3 = 0.001
+
+
+    x0 = targetA[0]/Z0
+    x1 = targetB[0]/Z1
+    x2 = targetF[0]/Z2
+    x3 = targetG[0]/Z3
+
+    g0 = targetA[1]/Z0
+    g1 = targetB[1]/Z1
+    g2 = targetF[1]/Z2
+    g3 = targetG[1]/Z3
+
+    """Z0 = 0.36
+    Z1 = 0.36
+    Z2 = 0.36
+    Z3 = 0.36"""
+
+    L0 = np.array([[-1.0/Z0, 0.0, x0/Z0, x0*g0, -(1.0+x0*x0), g0],
+                   [0.0, -1.0/Z0, g0/Z0, 1.0+g0*g0, -x0*g0, -x0]])
+
+    L1 = np.array([[-1.0/Z1, 0.0, x1/Z1, x1*g1, -(1.0+x1*x1), g1],
+                   [0.0, -1.0/Z1, g1/Z1, 1.0+g1*g1, -x1*g1, -x1]])
+
+    L2 = np.array([[-1.0/Z2, 0.0, x2/Z2, x2*g2, -(1.0+x2*x2), g2],
+                   [0.0, -1.0/Z2, g2/Z2, 1.0+g2*g2, -x2*g2, -x2]])
+
+    L3 = np.array([[-1.0/Z3, 0.0, x3/Z3, x3*g3, -(1.0+x3*x3), g3],
+                   [0.0, -1.0/Z3, g3/Z3, 1.0+g3*g3, -x3*g3, -x3]])
+
+    Le = np.vstack([L0, L1, L2, L3])
+
+  
+
+    """x0d =  -0.270150099566
+    g0d =  -0.187924335045
+
+    x1d =  0.292452882656
+    g1d = -0.170621433177 
+
+    x2d = -0.283336910445 
+    g2d = 0.3612224025117
+
+    x3d =  0.257390650938
+    g3d =  0.373380709355"""
+
+    x0d =  -0.471150846587
+    g0d =   -0.246536463472
+
+    x1d =  0.103806906011
+    g1d = -0.229450684874 
+
+    x2d = -0.476576803322 
+    g2d =  0.323560120968
+
+    x3d =  0.0876109469857
+    g3d =  0.331481470393
+
+    s = np.array([x0, g0, x1, g1, x2, g2, x3, g3]).reshape(8,1)
+    ed = np.array([x0-x0d, g0-g0d, x1-x1d, g1-g1d, x2-x2d, g2-g2d, x3-x3d, g3-g3d]).reshape(8,1)
+
+
+    eu = np.array([x0-x0d, x1-x1d, x2-x2d, x3-x3d]).reshape(4,1)*ax
+    ev = np.array([g0-g0d, g1-g1d, g2-g2d, g3-g3d]).reshape(4,1)*ay
+
+    u = np.array([x0,x1,x2,x3]).reshape(4,1)*ax
+    v = np.array([g0,g1,g2,g3]).reshape(4,1)*ay
+
+    ud = np.array([x0d,x1d,x2d,x3d]).reshape(4,1)*ax
+    vd = np.array([g0d,g1d,g2d,g3d]).reshape(4,1)*ay
+ 
+   
+    #print "ud:",ud
+    #print "vd:",vd
+
+    print "eu:", eu, "\n"
+    print "ev:", ev, "\n" 
+ 
+    print "Z0:", Z0, "Z1:", Z1,  "Z2:", Z2,  "Z3:", Z3
+   
+    """print "x0:", x0, "g0:", g0
+    print "x1:", x1, "g1:", g1
+    print "x2:", x2, "g2:", g2
+    print "x3:", x3, "g3:", g3"""
+
+    """print "u0-u0:", x0*ax, "v0-v0:", g0*ay, "\n"
+    print "u1-u0:", x1*ax, "v1-v0:", g1*ay, "\n"
+    print "u2-u0:", x2*ax, "v2-v0:", g2*ay, "\n"
+    print "u3-u0:", x3*ax, "v3-v0:", g3*ay, "\n" """
+
+    return Le, ed, s, eu, ev, ud, vd, u, v
+
+def pa10VSControl(q,Rcn,Le,ed,K):
+
+    # Calculate Jacobian
+    Jac = pa10Jacobian(q)
+         
+    #Forward Kinematics
+    p, Rnb = pa10FKDHModified(q)
+    RRbn = np.bmat ([[Rnb, np.zeros([3,3])], [np.zeros([3,3]), Rnb]]) 
+    Vnc = np.bmat([[Rcn.T, np.zeros([3,3])], [np.zeros([3,3]),Rcn.T]])
+    
+    #Calculate the Jacobian which connects the features velocities 
+    Js = np.dot(Le, np.dot(Vnc, np.dot(RRbn.T, Jac)))
+    
+    #Control Law
+    qveldvs = -K*np.dot(np.linalg.pinv(Js), ed)
+    return qveldvs
+
+
+def performanceFunction(Mi, rho_f, lamda, t):
+    return (1.0 - rho_f/Mi)*exp(-lamda*t) + (rho_f/Mi)
+
+    
+def ppcIBVS(eu, ev, t, ud, vd):
+
+    rho_f = 5.0
+    lamda = 0.2
+
+    global rhol_u 
+    global rhol_v 
+    global rhou_u 
+    global rhou_v
+
+    global Ml_u
+    global Ml_v
+    global Mu_u
+    global Mu_v
+
+    umin = -319.0*np.array([1.0, 1.0, 1.0, 1.0]).reshape(4,1)
+    umax =  319.0*np.array([1.0, 1.0, 1.0, 1.0]).reshape(4,1)
+    vmin = -239.0*np.array([1.0, 1.0, 1.0, 1.0]).reshape(4,1)
+    vmax =  239.0*np.array([1.0, 1.0, 1.0, 1.0]).reshape(4,1)
+
+    Ml_u = ud - umin
+    Ml_v = vd - vmin
+
+    Mu_u = umax - ud
+    Mu_v = vmax - vd
+
+    rhol_u = performanceFunction(Ml_u, rho_f, lamda, t)
+    rhol_v = performanceFunction(Ml_v, rho_f, lamda, t)
+    rhou_u = performanceFunction(Mu_u, rho_f, lamda, t)
+    rhou_v = performanceFunction(Mu_v, rho_f, lamda, t)
+
+    ksi_u = ( eu - (Mu_u*rhou_u - Ml_u*rhol_u)/2.0 ) / (  (Mu_u*rhou_u + Ml_u*rhol_u)/2.0   )
+    ksi_v = ( ev - (Mu_v*rhou_v - Ml_v*rhol_v)/2.0 ) / (  (Mu_v*rhou_v + Ml_v*rhol_v)/2.0   )
+
+    for i in range(0,4):
+        if ksi_u[i] > 0.99:
+           ksi_u[i] = 0.99
+        elif ksi_u[i] < -0.99:
+           ksi_u[i] = -0.99
+        if ksi_v[i] > 0.99:
+           ksi_v[i] = 0.99
+        elif ksi_v[i] < -0.99:
+           ksi_v[i] = -0.99
+
+
+    tfErrorsu = 2.0*np.arctanh(ksi_u) + np.log(Mu_u*rhou_u) - np.log(Ml_u*rhol_u)
+    tfErrorsv = 2.0*np.arctanh(ksi_v) + np.log(Mu_v*rhou_v) - np.log(Ml_v*rhol_v)
+
+    ppcErrors = np.array([tfErrorsu[0], tfErrorsv[0], tfErrorsu[1], tfErrorsv[1], tfErrorsu[2], tfErrorsv[2], tfErrorsu[3], tfErrorsv[3] ]).reshape(8,1)
+
+    """print "Ml_u:",Ml_u
+    print "Ml_v:",Ml_v
+    print "Mu_u:",Mu_u
+    print "Mu_v:",Mu_v"""
+
+    return ppcErrors, rhol_u, rhol_v, rhou_u, rhou_v
+ 
+
+if __name__ == '__main__':
+    try:
+        rospy.init_node('PA10VisualServoControl')
+        #Loop Rate
+        rate_it = rospy.Rate(10)        
+        # Create publishers
+        pub_vel = rospy.Publisher('/pa10/qdot_cmd', Float64MultiArray, queue_size=1)
+        pub_data = rospy.Publisher('/pa10/ppc_data', PPCVisionData, queue_size=1)
+	#Subscribers
+        rospy.Subscriber("/pa10/joint_positions", Float64MultiArray, updateArmStates) #Arm Joints Position
+        rospy.Subscriber("/ar_pose_marker", ARMarkersExtended, updateVisionStatesIBVS) 
+        
+        Rcn = np.array([[1.0, 0.0, 0.0],[0.0, 1.0, 0.0],[0.0, 0.0, 1.0]])
+       
+        qv = np.zeros ((7,1))
+
+        t0 = rospy.Time.now().to_sec()
+
+        ap = argparse.ArgumentParser()
+        ap.add_argument("--ppc", action = "store_true")
+        args = ap.parse_args(rospy.myargv()[1:])
+
+        while not rospy.is_shutdown():
+        
+            #Update Global Time
+            t = rospy.Time.now().to_sec() - t0
+            
+            #Image Based Visual Servoing
+            Le,ed,s, eu, ev, ud, vd, u, v = ImageBasedVS(targetA, targetB, targetF, targetG)
+
+
+            if args.ppc:
+               #PPC Approach
+               ppcErrors, rhol_u, rhol_v, rhou_u, rhou_v = ppcIBVS(eu, ev, t, ud, vd)
+               Ucmds = -np.dot(np.linalg.pinv(Le), ppcErrors)
+               K =   0.018*np.eye(7, dtype=float)
+               qv  = pa10VSControl(q,Rcn,Le, ppcErrors,K)
+
+            else:
+               #Classic IBVS Approach
+               K =   0.3*np.eye(7, dtype=float)
+               Ucmds = -np.dot(np.linalg.pinv(Le), ed)
+               qv  = pa10VSControl(q,Rcn,Le,ed,K)
+
+   
+            #Fill Data Log msg
+            visionData = PPCVisionData()
+            visionData.eu = list(eu)
+            visionData.ev = list(ev)
+            visionData.u = list(u)
+            visionData.v = list(v)
+            visionData.Ucmds = list(Ucmds)
+            visionData.rhol_u = list(-Ml_u*rhol_u)
+            visionData.rhol_v = list(-Ml_v*rhol_v) 
+            visionData.rhou_u = list(Mu_u*rhou_u)
+            visionData.rhou_v = list(Mu_v*rhou_v)
+
+          
+            #Fill CMD Msg             
+            cmd = Float64MultiArray()
+            cmd.layout.dim = [MultiArrayDimension()]
+            cmd.layout.dim[0].size = 7
+            cmd.layout.dim[0].stride = 7
+            cmd.layout.data_offset = 0
+            cmd.data = list (float (qvelt) for qvelt in qv) 
+            
+            #print cmd.data
+            pub_vel.publish (cmd)
+            pub_data.publish (visionData)
+      
+            rate_it.sleep()
+        rospy.spin()
+
+    except rospy.ROSInterruptException: pass

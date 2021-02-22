@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+
+import roslib
+import rospy
+import time
+import numpy as np
+from math import *
+from ar_pose.msg import ARMarkersExtended
+from geometry_msgs.msg import Twist, Quaternion, Vector3
+from math_utils import *
+
+
+def ImageBasedVS(targetA, targetB, targetF, targetG):
+
+    Z0 = targetA[2]
+    Z1 = targetB[2]
+    Z2 = targetF[2]
+    Z3 = targetG[2]
+
+    if Z0 == 0.0:
+       Z0 = 0.001
+    if Z1 == 0.0:
+       Z1 = 0.001
+    if Z2 == 0.0:
+       Z2 = 0.001
+    if Z3 == 0.0:
+       Z3 = 0.001
+
+
+    x0 = targetA[0]/Z0
+    x1 = targetB[0]/Z1
+    x2 = targetF[0]/Z2
+    x3 = targetG[0]/Z3
+
+    g0 = targetA[1]/Z0
+    g1 = targetB[1]/Z1
+    g2 = targetF[1]/Z2
+    g3 = targetG[1]/Z3
+
+
+    L0 = np.array([[-1.0/Z0, 0.0, x0/Z0, x0*g0, -(1.0+x0*x0), g0],
+                   [0.0, -1.0/Z0, g0/Z0, 1.0+g0*g0, -x0*g0, -x0]])
+
+    L1 = np.array([[-1.0/Z1, 0.0, x1/Z1, x1*g1, -(1.0+x1*x1), g1],
+                   [0.0, -1.0/Z1, g1/Z1, 1.0+g1*g1, -x1*g1, -x1]])
+
+    L2 = np.array([[-1.0/Z2, 0.0, x2/Z2, x2*g2, -(1.0+x2*x2), g2],
+                   [0.0, -1.0/Z2, g2/Z2, 1.0+g2*g2, -x2*g2, -x2]])
+
+    L3 = np.array([[-1.0/Z3, 0.0, x3/Z3, x3*g3, -(1.0+x3*x3), g3],
+                   [0.0, -1.0/Z3, g3/Z3, 1.0+g3*g3, -x3*g3, -x3]])
+
+    Le = np.vstack([L0, L1, L2, L3])
+
+    x0d =  -0.115184126158 
+    g0d =  -0.0597637153044
+    x1d =   0.123801946199 
+    g1d = -0.0601638543221
+    x2d = -0.108554349505 
+    g2d = 0.213405478284
+    x3d = 0.133122129135 
+    g3d = 0.205174957199
+    
+    s = np.array([x0, g0, x1, g1, x2, g2, x3, g3]).reshape(8,1)
+    ed = np.array([x0-x0d, g0-g0d, x1-x1d, g1-g1d, x2-x2d, g2-g2d, x3-x3d, g3-g3d]).reshape(8,1)
+
+    
+    """
+    print "x0:", x0, "g0:", g0
+    print "x1:", x1, "g1:", g1
+    print "x2:", x2, "g2:", g2
+    print "x3:", x3, "g3:", g3"""
+
+    return Le, ed, s

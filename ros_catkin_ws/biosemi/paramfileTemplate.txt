@@ -1,0 +1,41 @@
+channelsin 5 
+0 1 2 3 4 
+meanidle 
+0.1 0.1 0.1 0.1 0.1
+mvic 
+1 1 1 1 1
+pcaIn 4 
+1 0 0 0 0 
+0 1 0 0 0
+0 0 1 0 0
+0 0 0 1 0
+mapIn 
+1 -1
+1 -1
+1 -1
+1 -1
+      
+channelsout 3
+ssOrder 2
+ssA 
+1 0 
+0 1
+ssB 
+1 0 0 0  
+0 1 0 0  
+ssC 
+1 0  
+0 1 
+0 0
+mapOut  
+1 -1  
+1 -1
+1 -1
+pcaOutT 5  
+1 0 0 
+0 1 0
+0 0 1
+1 0 0
+0 1 0  
+meanout 
+1 1 1 1 1

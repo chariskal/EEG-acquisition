@@ -1,0 +1,11 @@
+Header header
+float64 t
+float64[5] q
+float64[5] qdot
+float64[5] qddot
+float64[5] torques
+float64[3] p
+float64[9] R
+float64 force
+float64[4] rho_pose_f
+float64[5] rho_qdot
